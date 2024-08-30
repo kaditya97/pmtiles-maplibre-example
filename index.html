@@ -37,7 +37,7 @@
         p.getHeader().then(h => {
             const map = new maplibregl.Map({
                 container: 'map',
-                zoom: h.maxZoom - 5,
+                zoom: 3,
                 center: [h.centerLon, h.centerLat],
                 style: {
                     version: 8,
