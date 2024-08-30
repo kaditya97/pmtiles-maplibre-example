@@ -1,0 +1,120 @@
+<html>
+
+<head>
+    <title>PMTiles MapLibre</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.css" crossorigin="anonymous">
+    <script src="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/pmtiles@3.0.7/dist/pmtiles.js"></script>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script type="text/javascript">
+        // 1.8 billion building, 122 GB data
+        // add the PMTiles plugin to the maplibregl global.
+        let protocol = new pmtiles.Protocol();
+        maplibregl.addProtocol("pmtiles", protocol.tile);
+
+        let PMTILES_URL = "https://data.source.coop/cholmes/google-open-buildings/google-open-buildings.pmtiles";
+
+        const p = new pmtiles.PMTiles(PMTILES_URL);
+
+        // this is so we share one instance across the JS code and the map renderer
+        protocol.add(p);
+
+        // we first fetch the header so we can get the center lon, lat of the map.
+        p.getHeader().then(h => {
+            const map = new maplibregl.Map({
+                container: 'map',
+                zoom: h.maxZoom - 5,
+                center: [h.centerLon, h.centerLat],
+                style: {
+                    version: 8,
+                    sources: {
+                        osm: {
+                            type: "raster",
+                            tiles: ["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                            tileSize: 256
+                        },
+                        "example_source": {
+                            type: "vector",
+                            url: "pmtiles://" + PMTILES_URL,
+                            attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>'
+                        }
+                    },
+                    layers: [
+                        {
+                            id: "osm",
+                            type: "raster",
+                            source: "osm"
+                        },
+                        {
+                            id: "example_layer",
+                            type: "fill",
+                            source: "example_source",
+                            "source-layer": "buildings",
+                            paint: {
+                                "fill-color": "red"
+                            }
+                        }
+                    ]
+                }
+            });
+
+            const popup = new maplibregl.Popup({
+                closeButton: false,
+                closeOnClick: false,
+                maxWidth: "none",
+            });
+            // map.showTileBoundaries = true;
+            map.on("mousemove", e => {
+                const { x, y } = e.point;
+                const r = 2; // radius around the point
+                let features = map.queryRenderedFeatures([
+                    [x - r, y - r],
+                    [x + r, y + r],
+                ]);
+                if (!features.length) {
+                    map.getCanvas().style.cursor = '';
+                    popup.remove();
+                } else {
+                    map.getCanvas().style.cursor = 'pointer';
+                    // Create an HTML table
+                    const table = document.createElement('table');
+
+                    // Iterate over the properties of the first feature's properties object
+                    Object.entries(features[0].properties).forEach(([key, value], i) => {
+                        const tr = document.createElement('tr');
+
+                        const tdKey = document.createElement('td');
+                        tdKey.textContent = key;
+
+                        const tdValue = document.createElement('td');
+                        tdValue.textContent = (typeof value === "boolean") ? JSON.stringify(value) : value;
+
+                        tr.appendChild(tdKey);
+                        tr.appendChild(tdValue);
+
+                        table.appendChild(tr);
+                    });
+                    popup.setHTML("<div>" + table.outerHTML + "</div>");
+                    popup.setLngLat(e.lngLat);
+                    popup.addTo(map);
+                }
+            });
+        })
+    </script>
+</body>
+
+</html>
